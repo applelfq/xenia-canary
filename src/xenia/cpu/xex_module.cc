@@ -11,6 +11,10 @@
 
 #include <algorithm>
 
+#include "third_party/crypto/TinySHA1.hpp"
+#include "third_party/crypto/rijndael-alg-fst.c"
+#include "third_party/crypto/rijndael-alg-fst.h"
+#include "third_party/pe/pe_image.h"
 #include "xenia/base/byte_order.h"
 #include "xenia/base/logging.h"
 #include "xenia/base/math.h"
@@ -20,12 +24,8 @@
 #include "xenia/cpu/lzx.h"
 #include "xenia/cpu/processor.h"
 #include "xenia/kernel/kernel_state.h"
+#include "xenia/kernel/user_module.h"
 #include "xenia/kernel/xmodule.h"
-
-#include "third_party/crypto/TinySHA1.hpp"
-#include "third_party/crypto/rijndael-alg-fst.c"
-#include "third_party/crypto/rijndael-alg-fst.h"
-#include "third_party/pe/pe_image.h"
 
 static const uint8_t xe_xex2_retail_key[16] = {
     0x20, 0xB1, 0x85, 0xA5, 0x9D, 0x28, 0xFD, 0xC3,
@@ -487,8 +487,6 @@ int XexModule::ReadImage(const void* xex_addr, size_t xex_length,
                 (uint8_t*)xex_addr + xex_header()->header_size, data_len);
     return 0;
   }
-
-  memory()->LookupHeap(base_address_)->Reset();
 
   aes_decrypt_buffer(
       use_dev_key ? xe_xex2_devkit_key : xe_xex2_retail_key,
@@ -1098,6 +1096,11 @@ bool XexModule::SetupLibraryImports(const char* name,
   }
 
   auto user_module = kernel_state_->GetModule(name);
+
+  if (!kernel_resolver && !user_module) {
+    // Library module hasn't been loaded in, ask kernel to load it:
+    user_module = kernel_state_->LoadUserModule(name);
+  }
 
   std::string libbasename = name;
   auto dot = libbasename.find_last_of('.');

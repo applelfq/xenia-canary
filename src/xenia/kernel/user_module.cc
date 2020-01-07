@@ -244,9 +244,9 @@ X_STATUS UserModule::LoadXexContinue() {
     return X_STATUS_SUCCESS;
   }
 
-  // Finish XexModule load (PE sections/imports/symbols...)
-  if (!xex_module()->LoadContinue()) {
-    return X_STATUS_UNSUCCESSFUL;
+  // Notify kernel that we have an executable if we haven't got one already
+  if (!kernel_state_->GetExecutableModule()) {
+    kernel_state_->SetExecutableModule(object_ref<UserModule>(this));
   }
 
   // Copy the xex2 header into guest memory.
@@ -271,6 +271,11 @@ X_STATUS UserModule::LoadXexContinue() {
   ldr_data->full_image_size = security_header->image_size;
   ldr_data->image_base = this->xex_module()->base_address();
   ldr_data->entry_point = entry_point_;
+
+  // Finish XexModule load (PE sections/imports/symbols...)
+  if (!xex_module()->LoadContinue()) {
+    return X_STATUS_UNSUCCESSFUL;
+  }
 
   OnLoad();
 
